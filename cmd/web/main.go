@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
+
 	"github.com/noppharat2784/nexus-crud/internal/database"
 	"github.com/noppharat2784/nexus-crud/internal/product"
 )
@@ -24,39 +26,153 @@ func main() {
 
 	log.Println("connected to PostgreSQL successfully")
 
-	// Route 1: GET /api/products
 	http.HandleFunc("/api/products", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+		switch r.Method {
 
-		products, err := product.List(r.Context(), db)
-		if err != nil {
-			log.Printf("list products: %v", err)
+		// Route 1: GET /api/products
+		case http.MethodGet:
+			// List Products
+			products, err := product.List(r.Context(), db)
+			if err != nil {
+				log.Printf("list products: %v", err)
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			response := struct {
+				Data []product.ProductListItem `json:"data"`
+			}{
+				Data: products,
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				log.Printf("encode response: %v", err)
+			}
+
+		// Route 2: POST /api/products
+		case http.MethodPost:
+			// Create Product
+			var input product.CreateProductInput
+
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				http.Error(
+					w,
+					"invalid request body",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			input.SKU = strings.TrimSpace(input.SKU)
+			input.ProductName = strings.TrimSpace(input.ProductName)
+
+			if input.TenantID <= 0 {
+				http.Error(
+					w,
+					"invalid tenant_id",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			if input.SKU == "" {
+				http.Error(
+					w,
+					"sku is required",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			if input.ProductName == "" {
+				http.Error(
+					w,
+					"product_name is required",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			if input.Price < 0 {
+				http.Error(
+					w,
+					"price must be >= 0",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			if input.ActualStock < 0 {
+				http.Error(
+					w,
+					"actual_stock must be >= 0",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			productID, err := product.Create(
+				r.Context(),
+				db,
+				input,
+			)
+			if err != nil {
+				log.Printf("create product: %v", err)
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			createdProduct, err := product.GetByID(
+				r.Context(),
+				db,
+				productID,
+			)
+			if err != nil {
+				log.Printf("get created product: %v", err)
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			response := struct {
+				Data product.ProductListItem `json:"data"`
+			}{
+				Data: createdProduct,
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+
+			w.WriteHeader(http.StatusCreated)
+
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				log.Printf("encode response: %v", err)
+			}
+
+		default:
 			http.Error(
 				w,
-				"internal server error",
-				http.StatusInternalServerError,
+				"method not allowed",
+				http.StatusMethodNotAllowed,
 			)
-			return
-		}
-
-		response := struct {
-			Data []product.ProductListItem `json:"data"`
-		}{
-			Data: products,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("encode response: %v", err)
 		}
 	})
-
-	// Route 2: GET /api/products/{id}
+	// Route 3: GET /api/products/{id}
 	http.HandleFunc("/api/products/{id}", func(w http.ResponseWriter, r *http.Request) {
+		// Product Detail
+
 		if r.Method != http.MethodGet {
 			http.Error(
 				w,
