@@ -65,3 +65,40 @@ func List(ctx context.Context, db *pgxpool.Pool) ([]ProductListItem, error) {
 
 	return products, nil
 }
+
+func GetByID(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	productID int64,
+) (ProductListItem, error) {
+	var p ProductListItem
+
+	err := db.QueryRow(ctx, `
+		SELECT
+			p.product_id,
+			p.tenant_id,
+			t.tenant_name,
+			p.sku,
+			p.product_name,
+			p.price,
+			p.actual_stock
+		FROM products p
+		JOIN tenants t
+			ON p.tenant_id = t.tenant_id
+		WHERE p.product_id = $1;
+	`, productID).Scan(
+		&p.ProductID,
+		&p.TenantID,
+		&p.TenantName,
+		&p.SKU,
+		&p.ProductName,
+		&p.Price,
+		&p.ActualStock,
+	)
+
+	if err != nil {
+		return ProductListItem{}, err
+	}
+
+	return p, nil
+}
