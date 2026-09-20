@@ -3,6 +3,7 @@ package product
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -19,6 +20,15 @@ type ProductListItem struct {
 // CreateProductInput represents the JSON payload required to create a Product.
 // product_id is omitted because PostgreSQL generates it.
 type CreateProductInput struct {
+	TenantID    int64   `json:"tenant_id"`
+	SKU         string  `json:"sku"`
+	ProductName string  `json:"product_name"`
+	Price       float64 `json:"price"`
+	ActualStock int     `json:"actual_stock"`
+}
+
+// Update Product
+type UpdateProductInput struct {
 	TenantID    int64   `json:"tenant_id"`
 	SKU         string  `json:"sku"`
 	ProductName string  `json:"product_name"`
@@ -144,4 +154,68 @@ func Create(
 	}
 
 	return productID, nil
+}
+
+// Update modifies an existing Product.
+// RowsAffected is checked because a valid UPDATE statement can succeed
+// while matching zero rows when the requested product_id does not exist.
+func Update(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	productID int64,
+	input UpdateProductInput,
+) error {
+	commandTag, err := db.Exec(ctx, `
+		UPDATE products
+		SET
+			tenant_id = $1,
+			sku = $2,
+			product_name = $3,
+			price = $4,
+			actual_stock = $5
+		WHERE product_id = $6;
+	`,
+		input.TenantID,
+		input.SKU,
+		input.ProductName,
+		input.Price,
+		input.ActualStock,
+		productID,
+	)
+	if err != nil {
+		return err
+	}
+
+	// UPDATE ที่ SQL ถูกต้องแต่หา product_id ไม่เจอจะไม่ถือเป็น SQL error
+	// ดังนั้นต้องตรวจจำนวน row ที่ถูกแก้เอง
+	if commandTag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
+}
+
+// Delete removes one Product by its primary key.
+// A valid DELETE statement does not return an error when no row matches,
+// so RowsAffected is used to distinguish "deleted" from "not found".
+func Delete(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	productID int64,
+) error {
+	commandTag, err := db.Exec(ctx, `
+		DELETE FROM products
+		WHERE product_id = $1;
+	`, productID)
+	if err != nil {
+		return err
+	}
+
+	// DELETE สำเร็จในระดับ SQL ได้แม้ไม่มี row ให้ลบ
+	// ถ้า affected 0 rows ให้ application ตีความว่า Product ไม่มีอยู่
+	if commandTag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
 }
