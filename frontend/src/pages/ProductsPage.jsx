@@ -90,7 +90,7 @@ export function ProductsPage() {
                   <p className="font-bold text-slate-950">{product.sku}</p>
                   <Link className="font-semibold text-slate-950 hover:text-blue-700" to={`/products/${product.product_id}`}>{product.product_name}</Link>
                   <p className="text-sm text-slate-600"><span className="mr-2 text-xs font-bold uppercase text-slate-400 md:hidden">Tenant</span>{product.tenant_name}</p>
-                  <p className="text-sm text-slate-700"><span className="mr-2 text-xs font-bold uppercase text-slate-400 md:hidden">Price</span>{product.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-sm text-slate-700"><span className="mr-2 text-xs font-bold uppercase text-slate-400 md:hidden">Price</span>฿{product.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   <p className="text-sm font-semibold"><span className="mr-2 text-xs font-bold uppercase text-slate-400 md:hidden">Stock</span>{product.actual_stock}</p>
                   <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3 md:border-0 md:pt-0">
                     <Button onClick={() => { setEditing(product); setFormOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }} variant="ghost">Edit</Button>

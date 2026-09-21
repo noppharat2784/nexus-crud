@@ -46,6 +46,8 @@ let reservations = [
   { reservation_id: 1003, product_id: 103, reserved_qty: 2, status: 'COMMITTED' },
 ]
 
+let stockMovements = []
+
 const nextId = (records, key, fallback) =>
   records.length === 0 ? fallback : Math.max(...records.map((record) => record[key])) + 1
 
@@ -63,6 +65,20 @@ const joinedReservations = () =>
     return {
       ...reservation,
       product_name: product?.product_name ?? 'Unknown',
+      tenant_id: tenant?.tenant_id ?? null,
+      tenant_name: tenant?.tenant_name ?? 'Unknown',
+    }
+  })
+
+const joinedStockMovements = () =>
+  stockMovements.map((movement) => {
+    const product = products.find((item) => item.product_id === movement.product_id)
+    const tenant = tenants.find((item) => item.tenant_id === product?.tenant_id)
+
+    return {
+      ...movement,
+      product_name: product?.product_name ?? 'Unknown',
+      sku: product?.sku ?? 'Unknown',
       tenant_id: tenant?.tenant_id ?? null,
       tenant_name: tenant?.tenant_name ?? 'Unknown',
     }
@@ -93,6 +109,10 @@ export const inventoryApi = {
 
   async listReservations() {
     return wait({ data: joinedReservations() })
+  },
+
+  async listStockMovements() {
+    return wait({ data: joinedStockMovements() })
   },
 
   async createTenant(values) {
@@ -192,5 +212,52 @@ export const inventoryApi = {
       (reservation) => reservation.reservation_id !== reservationId,
     )
     return wait({ data: null })
+  },
+
+  async createStockMovement(values) {
+    const productId = Number(values.product_id)
+    const quantity = Number(values.quantity)
+    const product = products.find((item) => item.product_id === productId)
+
+    if (!product) {
+      fail('PRODUCT_NOT_FOUND', 'The selected product does not exist.', 404)
+    }
+
+    if (!['IN', 'OUT'].includes(values.movement_type)) {
+      fail('INVALID_MOVEMENT_TYPE', 'Movement type must be IN or OUT.')
+    }
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      fail('INVALID_QUANTITY', 'Quantity must be a positive whole number.')
+    }
+
+    const stockBefore = product.actual_stock
+    const stockAfter =
+      values.movement_type === 'IN'
+        ? stockBefore + quantity
+        : stockBefore - quantity
+
+    if (stockAfter < 0) {
+      fail('INSUFFICIENT_STOCK', 'Not enough stock for this movement.', 409)
+    }
+
+    products = products.map((item) =>
+      item.product_id === productId
+        ? { ...item, actual_stock: stockAfter }
+        : item,
+    )
+
+    const movement = {
+      movement_id: nextId(stockMovements, 'movement_id', 1),
+      product_id: productId,
+      movement_type: values.movement_type,
+      quantity,
+      stock_before: stockBefore,
+      stock_after: stockAfter,
+      created_at: new Date().toISOString(),
+    }
+
+    stockMovements = [movement, ...stockMovements]
+    return wait({ data: joinedStockMovements()[0] })
   },
 }

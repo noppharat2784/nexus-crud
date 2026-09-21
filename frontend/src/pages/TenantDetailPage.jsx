@@ -28,7 +28,7 @@ export function TenantDetailPage() {
           {tenantProducts.map((product) => (
             <Link className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 hover:bg-slate-50" key={product.product_id} to={`/products/${product.product_id}`}>
               <div><p className="font-semibold text-slate-950">{product.product_name}</p><p className="mt-1 text-sm text-slate-500">{product.sku}</p></div>
-              <div className="text-right"><p className="font-semibold">Stock {product.actual_stock}</p><p className="mt-1 text-sm text-slate-500">{product.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p></div>
+              <div className="text-right"><p className="font-semibold">Stock {product.actual_stock}</p><p className="mt-1 text-sm text-slate-500">฿{product.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p></div>
             </Link>
           ))}
         </section>

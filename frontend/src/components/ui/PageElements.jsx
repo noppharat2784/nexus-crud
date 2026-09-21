@@ -13,11 +13,18 @@ export function PageHeader({ title, description, action }) {
   )
 }
 
-export function MetricCard({ label, value, detail }) {
+export function MetricCard({ label, value, detail, tone = 'default' }) {
+  const valueStyles = {
+    default: 'text-slate-950',
+    blue: 'text-blue-600',
+    emerald: 'text-emerald-600',
+    slate: 'text-slate-500',
+  }
+
   return (
     <div className="min-w-0 bg-white px-5 py-4">
       <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</p>
+      <p className={`mt-1 text-3xl font-bold tracking-tight ${valueStyles[tone]}`}>{value}</p>
       {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
     </div>
   )

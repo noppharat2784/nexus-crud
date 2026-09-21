@@ -42,7 +42,7 @@ export function ProductDetailPage() {
       <section className="grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ['Tenant', product.tenant_name],
-          ['Price', product.price.toLocaleString(undefined, { minimumFractionDigits: 2 })],
+          ['Price', `฿${product.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`],
           ['Actual stock', product.actual_stock],
           ['Product ID', `#${product.product_id}`],
         ].map(([label, value]) => <div className="bg-white p-5" key={label}><p className="text-sm font-medium text-slate-500">{label}</p><p className="mt-2 text-xl font-bold text-slate-950">{value}</p></div>)}

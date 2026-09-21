@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Icon } from '../ui/Icon.jsx'
+import { inventoryDataSource } from '../../api/dataSource.js'
 
 const navigation = [
   { label: 'Dashboard', to: '/', icon: 'dashboard' },
@@ -45,7 +46,9 @@ export function AppShell() {
         <p className="text-lg font-bold tracking-wide text-white">NEXUS INVENTORY</p>
         <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Inventory workspace</p>
         <Navigation />
-        <p className="absolute bottom-7 left-5 text-xs text-slate-500">Milestone 0 · Live API</p>
+        <p className="absolute bottom-7 left-5 text-xs text-slate-500">
+          Data source · {inventoryDataSource === 'mock' ? 'Mock API' : 'Live API'}
+        </p>
       </aside>
 
       <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-slate-950 px-4 text-white lg:hidden">

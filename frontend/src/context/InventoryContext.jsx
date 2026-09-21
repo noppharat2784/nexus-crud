@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { inventoryApi } from '../api/inventoryApi.js'
+import { inventoryApi } from '../api/dataSource.js'
 
 const InventoryContext = createContext(null)
 
