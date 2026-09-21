@@ -14,6 +14,7 @@ import (
 	"github.com/noppharat2784/nexus-crud/internal/database"
 	"github.com/noppharat2784/nexus-crud/internal/product"
 	"github.com/noppharat2784/nexus-crud/internal/reservation"
+	"github.com/noppharat2784/nexus-crud/internal/stockmovement"
 	"github.com/noppharat2784/nexus-crud/internal/tenant"
 )
 
@@ -1004,6 +1005,155 @@ func main() {
 
 			// Successful DELETE returns no response body.
 			w.WriteHeader(http.StatusNoContent)
+
+		default:
+			http.Error(
+				w,
+				"method not allowed",
+				http.StatusMethodNotAllowed,
+			)
+		}
+	})
+
+	http.HandleFunc("/api/stock-movements", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			movements, err := stockmovement.List(
+				r.Context(),
+				db,
+			)
+
+			if err != nil {
+				log.Printf("list stock movements: %v", err)
+
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+
+			response := struct {
+				Data []stockmovement.StockMovementListItem `json:"data"`
+			}{
+				Data: movements,
+			}
+
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				log.Printf("encode stock movements response: %v", err)
+			}
+
+		case http.MethodPost:
+			var input stockmovement.CreateStockMovementInput
+
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				http.Error(
+					w,
+					"invalid JSON body",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			input.MovementType = strings.ToUpper(
+				strings.TrimSpace(input.MovementType),
+			)
+
+			if input.ProductID <= 0 {
+				http.Error(
+					w,
+					"product_id must be > 0",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			if input.Quantity <= 0 {
+				http.Error(
+					w,
+					"quantity must be > 0",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			if input.MovementType != "IN" &&
+				input.MovementType != "OUT" {
+				http.Error(
+					w,
+					"movement_type must be IN or OUT",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			movementID, err := stockmovement.Create(
+				r.Context(),
+				db,
+				input,
+			)
+
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					http.Error(
+						w,
+						"product not found",
+						http.StatusNotFound,
+					)
+					return
+				}
+
+				if errors.Is(err, stockmovement.ErrInsufficientStock) {
+					http.Error(
+						w,
+						"stock out exceeds available stock",
+						http.StatusConflict,
+					)
+					return
+				}
+
+				log.Printf("create stock movement: %v", err)
+
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			movement, err := stockmovement.GetByID(
+				r.Context(),
+				db,
+				movementID,
+			)
+
+			if err != nil {
+				log.Printf("get created stock movement: %v", err)
+
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+
+			response := struct {
+				Data stockmovement.StockMovementListItem `json:"data"`
+			}{
+				Data: movement,
+			}
+
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				log.Printf("encode create stock movement response: %v", err)
+			}
 
 		default:
 			http.Error(

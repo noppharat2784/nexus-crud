@@ -24,6 +24,24 @@ CREATE TABLE Products (
 
 );
 
+CREATE TABLE Stock_Movements (
+    movement_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    product_id BIGINT NOT NULL,
+    movement_type VARCHAR(10) NOT NULL,
+    quantity INT NOT NULL,
+    stock_before INT NOT NULL,
+    stock_after INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (product_id)
+        REFERENCES Products(product_id),
+
+    CHECK (movement_type IN ('IN', 'OUT')),
+    CHECK (quantity > 0),
+    CHECK (stock_before >= 0),
+    CHECK (stock_after >= 0)
+);
+
 CREATE TABLE Reservations (
     
     reservation_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

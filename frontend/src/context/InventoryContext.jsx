@@ -4,21 +4,33 @@ import { inventoryApi } from '../api/inventoryApi.js'
 const InventoryContext = createContext(null)
 
 async function loadInventory() {
-  const [tenantResponse, productResponse, reservationResponse] = await Promise.all([
+  const [
+    tenantResponse,
+    productResponse,
+    reservationResponse,
+    stockMovementResponse,
+  ] = await Promise.all([
     inventoryApi.listTenants(),
     inventoryApi.listProducts(),
     inventoryApi.listReservations(),
+    inventoryApi.listStockMovements(),
   ])
 
   return {
     tenants: tenantResponse.data,
     products: productResponse.data,
     reservations: reservationResponse.data,
+    stockMovements: stockMovementResponse.data,
   }
 }
 
 export function InventoryProvider({ children }) {
-  const [data, setData] = useState({ tenants: [], products: [], reservations: [] })
+  const [data, setData] = useState({
+    tenants: [],
+    products: [],
+    reservations: [],
+    stockMovements: [],
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -73,6 +85,8 @@ export function InventoryProvider({ children }) {
       updateReservation: (id, values) =>
         mutate(() => inventoryApi.updateReservation(id, values)),
       deleteReservation: (id) => mutate(() => inventoryApi.deleteReservation(id)),
+      createStockMovement: (values) =>
+        mutate(() => inventoryApi.createStockMovement(values)),
     }),
     [mutate],
   )

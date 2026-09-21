@@ -134,4 +134,21 @@ export const inventoryApi = {
             method: 'DELETE',
         })
     },
+
+    // ---------- Stock Movements ----------
+
+    async listStockMovements() {
+        return request('/api/stock-movements')
+    },
+
+    async createStockMovement(values) {
+        return request(
+            '/api/stock-movements',
+            jsonRequest('POST', {
+                product_id: Number(values.product_id),
+                movement_type: values.movement_type,
+                quantity: Number(values.quantity),
+            }),
+        )
+    },
 }

@@ -7,6 +7,7 @@ import { ProductDetailPage } from './pages/ProductDetailPage.jsx'
 import { ProductsPage } from './pages/ProductsPage.jsx'
 import { ReportsPage } from './pages/ReportsPage.jsx'
 import { ReservationsPage } from './pages/ReservationsPage.jsx'
+import { StockMovementsPage } from './pages/StockMovementsPage.jsx'
 import { TenantDetailPage } from './pages/TenantDetailPage.jsx'
 import { TenantsPage } from './pages/TenantsPage.jsx'
 
@@ -22,6 +23,10 @@ function App() {
             <Route element={<ProductsPage />} path="products" />
             <Route element={<ProductDetailPage />} path="products/:id" />
             <Route element={<ReservationsPage />} path="reservations" />
+            <Route
+              element={<StockMovementsPage />}
+              path="stock-movements"
+            />
             <Route element={<ReportsPage />} path="reports" />
             <Route element={<NotFoundPage />} path="*" />
           </Route>
