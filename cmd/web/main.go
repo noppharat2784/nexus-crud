@@ -401,47 +401,213 @@ func main() {
 			)
 		}
 	})
-	// Route 6: GET /api/tenants
-	//
-	// This endpoint provides Tenant data for UI controls such as
-	// the Tenant dropdown used by Product Create/Edit forms.
 	http.HandleFunc("/api/tenants", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
+			tenants, err := tenant.List(r.Context(), db)
+			if err != nil {
+				log.Printf("list tenants: %v", err)
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+
+			response := struct {
+				Data []tenant.TenantListItem `json:"data"`
+			}{
+				Data: tenants,
+			}
+
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				log.Printf("encode tenants response: %v", err)
+			}
+
+		case http.MethodPost:
+			var input tenant.CreateTenantInput
+
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				http.Error(
+					w,
+					"invalid JSON body",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			input.TenantName = strings.TrimSpace(input.TenantName)
+
+			if input.TenantName == "" {
+				http.Error(
+					w,
+					"tenant_name is required",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			tenantID, err := tenant.Create(
+				r.Context(),
+				db,
+				input,
+			)
+			if err != nil {
+				log.Printf("create tenant: %v", err)
+
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+
+			response := struct {
+				Data tenant.TenantListItem `json:"data"`
+			}{
+				Data: tenant.TenantListItem{
+					TenantID:   tenantID,
+					TenantName: input.TenantName,
+				},
+			}
+
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				log.Printf("encode create tenant response: %v", err)
+			}
+
+		default:
 			http.Error(
 				w,
 				"method not allowed",
 				http.StatusMethodNotAllowed,
 			)
-			return
 		}
+	})
 
-		tenants, err := tenant.List(
-			r.Context(),
-			db,
+	http.HandleFunc("/api/tenants/{id}", func(w http.ResponseWriter, r *http.Request) {
+		tenantID, err := strconv.ParseInt(
+			r.PathValue("id"),
+			10,
+			64,
 		)
-		if err != nil {
-			log.Printf("list tenants: %v", err)
+
+		if err != nil || tenantID <= 0 {
 			http.Error(
 				w,
-				"internal server error",
-				http.StatusInternalServerError,
+				"invalid tenant id",
+				http.StatusBadRequest,
 			)
 			return
 		}
 
-		response := struct {
-			Data []tenant.TenantListItem `json:"data"`
-		}{
-			Data: tenants,
-		}
+		switch r.Method {
+		case http.MethodPut:
+			var input tenant.UpdateTenantInput
 
-		w.Header().Set(
-			"Content-Type",
-			"application/json",
-		)
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				http.Error(
+					w,
+					"invalid JSON body",
+					http.StatusBadRequest,
+				)
+				return
+			}
 
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("encode response: %v", err)
+			input.TenantName = strings.TrimSpace(input.TenantName)
+
+			if input.TenantName == "" {
+				http.Error(
+					w,
+					"tenant_name is required",
+					http.StatusBadRequest,
+				)
+				return
+			}
+
+			err := tenant.Update(
+				r.Context(),
+				db,
+				tenantID,
+				input,
+			)
+
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					http.Error(
+						w,
+						"tenant not found",
+						http.StatusNotFound,
+					)
+					return
+				}
+
+				log.Printf("update tenant: %v", err)
+
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+
+			response := struct {
+				Data tenant.TenantListItem `json:"data"`
+			}{
+				Data: tenant.TenantListItem{
+					TenantID:   tenantID,
+					TenantName: input.TenantName,
+				},
+			}
+
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				log.Printf("encode update tenant response: %v", err)
+			}
+
+		case http.MethodDelete:
+			err := tenant.Delete(
+				r.Context(),
+				db,
+				tenantID,
+			)
+
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					http.Error(
+						w,
+						"tenant not found",
+						http.StatusNotFound,
+					)
+					return
+				}
+
+				log.Printf("delete tenant: %v", err)
+
+				http.Error(
+					w,
+					"internal server error",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			w.WriteHeader(http.StatusNoContent)
+
+		default:
+			http.Error(
+				w,
+				"method not allowed",
+				http.StatusMethodNotAllowed,
+			)
 		}
 	})
 
@@ -525,6 +691,43 @@ func main() {
 					http.StatusBadRequest,
 				)
 				return
+			}
+
+			// Active Reservation states must not exceed currently available stock.
+			// RELEASED does not consume stock.
+			if input.Status != "RELEASED" {
+				availableStock, err := reservation.GetAvailableStock(
+					r.Context(),
+					db,
+					input.ProductID,
+				)
+				if err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						http.Error(
+							w,
+							"product not found",
+							http.StatusNotFound,
+						)
+						return
+					}
+
+					log.Printf("get available stock: %v", err)
+					http.Error(
+						w,
+						"internal server error",
+						http.StatusInternalServerError,
+					)
+					return
+				}
+
+				if input.ReservedQty > availableStock {
+					http.Error(
+						w,
+						"reserved quantity exceeds available stock",
+						http.StatusConflict,
+					)
+					return
+				}
 			}
 
 			reservationID, err := reservation.Create(
@@ -681,6 +884,44 @@ func main() {
 					http.StatusBadRequest,
 				)
 				return
+			}
+
+			// Exclude the Reservation currently being edited
+			// so its existing quantity is not counted twice.
+			if input.Status != "RELEASED" {
+				availableStock, err := reservation.GetAvailableStockForUpdate(
+					r.Context(),
+					db,
+					input.ProductID,
+					reservationID,
+				)
+				if err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						http.Error(
+							w,
+							"product not found",
+							http.StatusNotFound,
+						)
+						return
+					}
+
+					log.Printf("get available stock for update: %v", err)
+					http.Error(
+						w,
+						"internal server error",
+						http.StatusInternalServerError,
+					)
+					return
+				}
+
+				if input.ReservedQty > availableStock {
+					http.Error(
+						w,
+						"reserved quantity exceeds available stock",
+						http.StatusConflict,
+					)
+					return
+				}
 			}
 
 			err := reservation.Update(
